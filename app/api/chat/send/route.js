@@ -36,11 +36,12 @@ async function signEbsChatJwt(broadcasterId) {
   const secret = getExtensionSecret();
   if (!secret) return null;
   const exp = Math.floor(Date.now() / 1000) + 60;
-  const jwt = await new SignJWT({})
+  const jwt = await new SignJWT({
+    user_id: String(broadcasterId),
+    role: 'broadcaster',
+  })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setExpirationTime(exp)
-    .setClaim('user_id', String(broadcasterId))
-    .setClaim('role', 'broadcaster')
     .sign(secret);
   return jwt;
 }
