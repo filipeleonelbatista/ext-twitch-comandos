@@ -9,9 +9,14 @@ function getExtensionSecret() {
   if (EXTENSION_SECRET.length === 32 && !EXTENSION_SECRET.includes(' ')) {
     return new TextEncoder().encode(EXTENSION_SECRET);
   }
-  if (Buffer.from(EXTENSION_SECRET, 'base64').length > 0) {
-    return new Uint8Array(Buffer.from(EXTENSION_SECRET, 'base64'));
-  }
+  try {
+    const binary = typeof Buffer !== 'undefined'
+      ? Buffer.from(EXTENSION_SECRET, 'base64')
+      : Uint8Array.from(atob(EXTENSION_SECRET), (c) => c.charCodeAt(0));
+    if (binary.length > 0) {
+      return binary instanceof Uint8Array ? binary : new Uint8Array(binary);
+    }
+  } catch (_) {}
   return new TextEncoder().encode(EXTENSION_SECRET);
 }
 
@@ -41,59 +46,81 @@ async function signEbsChatJwt(broadcasterId) {
 }
 
 export async function POST(request) {
-  const auth = request.headers.get('authorization');
-  if (!auth || !auth.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Missing or invalid Authorization' }, { status: 401 });
-  }
-  const token = auth.slice(7);
-  const payload = await verifyFrontendJwt(token);
-  if (!payload) {
-    return NextResponse.json({ error: 'Invalid JWT' }, { status: 401 });
-  }
-
-  const broadcasterId = payload.channel_id ?? payload.user_id;
-  const senderId = payload.user_id ?? payload.opaque_user_id;
-  if (!broadcasterId || !senderId) {
-    return NextResponse.json({ error: 'Missing channel or user in JWT' }, { status: 400 });
-  }
-  const senderIdNumeric = String(payload.user_id ?? senderId);
-
-  let body;
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-  const message = typeof body.message === 'string' ? body.message.trim().slice(0, 500) : '';
-  if (!message) {
-    return NextResponse.json({ error: 'Missing message' }, { status: 400 });
-  }
+    const auth = request.headers.get('authorization');
+    if (!auth || !auth.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Missing or invalid Authorization' }, { status: 401 });
+    }
+    const token = auth.slice(7);
+    const payload = await verifyFrontendJwt(token);
+    if (!payload) {
+      return NextResponse.json({ error: 'Invalid JWT' }, { status: 401 });
+    }
 
-  const ebsJwt = await signEbsChatJwt(broadcasterId);
-  if (!ebsJwt) {
-    return NextResponse.json({ error: 'EBS JWT not configured' }, { status: 500 });
-  }
+    const broadcasterId = payload.channel_id ?? payload.user_id;
+    const senderId = payload.user_id ?? payload.opaque_user_id;
+    if (!broadcasterId || !senderId) {
+      return NextResponse.json({ error: 'Missing channel or user in JWT' }, { status: 400 });
+    }
+    const senderIdNumeric = String(payload.user_id ?? senderId);
 
-  const res = await fetch('https://api.twitch.tv/helix/chat/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${ebsJwt}`,
-      'Client-Id': EXTENSION_CLIENT_ID,
-    },
-    body: JSON.stringify({
-      broadcaster_id: String(broadcasterId),
-      sender_id: senderIdNumeric,
-      message,
-    }),
-  });
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+    const message = typeof body.message === 'string' ? body.message.trim().slice(0, 500) : '';
+    if (!message) {
+      return NextResponse.json({ error: 'Missing message' }, { status: 400 });
+    }
 
-  if (res.ok) {
-    return new NextResponse(null, { status: 204 });
+    const secret = getExtensionSecret();
+    if (!secret) {
+      return NextResponse.json(
+        { error: 'EBS JWT not configured', detail: 'EXTENSION_SECRET is not set' },
+        { status: 500 }
+      );
+    }
+    if (!EXTENSION_CLIENT_ID) {
+      return NextResponse.json(
+        { error: 'EBS JWT not configured', detail: 'EXTENSION_CLIENT_ID (or TWITCH_CLIENT_ID) is not set' },
+        { status: 500 }
+      );
+    }
+
+    const ebsJwt = await signEbsChatJwt(broadcasterId);
+    if (!ebsJwt) {
+      return NextResponse.json({ error: 'EBS JWT signing failed' }, { status: 500 });
+    }
+
+    const res = await fetch('https://api.twitch.tv/helix/chat/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${ebsJwt}`,
+        'Client-Id': EXTENSION_CLIENT_ID,
+      },
+      body: JSON.stringify({
+        broadcaster_id: String(broadcasterId),
+        sender_id: senderIdNumeric,
+        message,
+      }),
+    });
+
+    if (res.ok) {
+      return new NextResponse(null, { status: 204 });
+    }
+    const text = await res.text();
+    return NextResponse.json(
+      { error: text || res.statusText, twitch_status: res.status },
+      { status: res.status >= 500 ? 502 : res.status }
+    );
+  } catch (err) {
+    console.error('[api/chat/send]', err);
+    return NextResponse.json(
+      { error: 'Internal server error', detail: err?.message ?? String(err) },
+      { status: 500 }
+    );
   }
-  const text = await res.text();
-  return NextResponse.json(
-    { error: text || res.statusText },
-    { status: res.status }
-  );
 }
