@@ -143,6 +143,9 @@ export default function PanelPage() {
 
     window.Twitch.ext.onAuthorized(async (a) => {
       setAuth(a);
+      try {
+        sessionStorage.setItem('usermetadata:ext:cololono', JSON.stringify(a));
+      } catch (_) {}
       setStatus('loading');
       try {
         const sub = await callSubCheck(a.token);

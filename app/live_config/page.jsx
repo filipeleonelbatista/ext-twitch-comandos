@@ -8,7 +8,12 @@ export default function LiveConfigPage() {
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.Twitch?.ext) return;
-    window.Twitch.ext.onAuthorized((a) => setAuth(a));
+    window.Twitch.ext.onAuthorized((a) => {
+      setAuth(a);
+      try {
+        sessionStorage.setItem('usermetadata:ext:cololono', JSON.stringify(a));
+      } catch (_) {}
+    });
   }, []);
 
   return (
