@@ -4,16 +4,22 @@ import { setBroadcasterToken, setViewerToken } from '@/lib/ebs-store';
 const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID || '';
 const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET || '';
 
+/** Same as auth/route.js – redirect_uri must match Twitch Console exactly (no trailing slash). */
+function getRedirectUri(request) {
+  const base = (process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin || '').replace(/\/$/, '');
+  return `${base}/api/auth/callback`;
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
   const state = searchParams.get('state') || '';
   const error = searchParams.get('error');
   const errorDescription = searchParams.get('error_description') || '';
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
 
   if (!code) {
     const isViewer = state.startsWith('viewer:');
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin || '').replace(/\/$/, '');
     const successPath = '/auth/success';
     const errorMsg = error === 'access_denied'
       ? 'Autorização cancelada. Você pode tentar novamente na extensão.'
@@ -24,7 +30,7 @@ export async function GET(request) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  const redirectUri = `${baseUrl}/api/auth/callback`;
+  const redirectUri = getRedirectUri(request);
 
   const tokenRes = await fetch('https://id.twitch.tv/oauth2/token', {
     method: 'POST',
@@ -72,6 +78,7 @@ export async function GET(request) {
       refreshToken,
       expiresAt,
     });
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin || '').replace(/\/$/, '');
     const successUrl = `${baseUrl}/auth/success?type=viewer`;
     return NextResponse.redirect(successUrl);
   }
