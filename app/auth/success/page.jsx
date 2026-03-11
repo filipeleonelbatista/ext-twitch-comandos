@@ -1,8 +1,9 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function AuthSuccessPage() {
+function AuthSuccessContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
   const type = searchParams.get('type');
@@ -41,5 +42,17 @@ export default function AuthSuccessPage() {
         Fechar janela
       </button>
     </div>
+  );
+}
+
+export default function AuthSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="panel-root" style={{ maxWidth: 420, margin: '40px auto', textAlign: 'center' }}>
+        <p style={{ color: 'var(--text-muted)' }}>Carregando...</p>
+      </div>
+    }>
+      <AuthSuccessContent />
+    </Suspense>
   );
 }
