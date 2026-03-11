@@ -8,12 +8,23 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
   const state = searchParams.get('state') || '';
+  const error = searchParams.get('error');
+  const errorDescription = searchParams.get('error_description') || '';
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
-  const redirectUri = `${baseUrl}/api/auth/callback`;
 
   if (!code) {
-    return new NextResponse('Missing code', { status: 400 });
+    const isViewer = state.startsWith('viewer:');
+    const successPath = '/auth/success';
+    const errorMsg = error === 'access_denied'
+      ? 'Autorização cancelada. Você pode tentar novamente na extensão.'
+      : error
+        ? `${error}${errorDescription ? ': ' + decodeURIComponent(errorDescription) : ''}`
+        : 'Nenhum código recebido. Feche esta aba e tente autorizar de novo pela extensão.';
+    const redirectUrl = `${baseUrl}${successPath}?type=${isViewer ? 'viewer' : 'broadcaster'}&error=${encodeURIComponent(errorMsg)}`;
+    return NextResponse.redirect(redirectUrl);
   }
+
+  const redirectUri = `${baseUrl}/api/auth/callback`;
 
   const tokenRes = await fetch('https://id.twitch.tv/oauth2/token', {
     method: 'POST',
