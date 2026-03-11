@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { setBroadcasterToken } from '@/lib/ebs-store';
+import { setBroadcasterToken, setViewerToken } from '@/lib/ebs-store';
 
 const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID || '';
 const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET || '';
@@ -49,12 +49,23 @@ export async function GET(request) {
   }
 
   const userData = await userRes.json();
-  const broadcasterId = userData.data?.[0]?.id;
-  if (!broadcasterId) {
+  const userId = userData.data?.[0]?.id;
+  if (!userId) {
     return new NextResponse('No user in response', { status: 400 });
   }
 
-  setBroadcasterToken(broadcasterId, {
+  const isViewer = state.startsWith('viewer:');
+  if (isViewer) {
+    setViewerToken(userId, {
+      accessToken,
+      refreshToken,
+      expiresAt,
+    });
+    const successUrl = `${baseUrl}/auth/success?type=viewer`;
+    return NextResponse.redirect(successUrl);
+  }
+
+  setBroadcasterToken(userId, {
     accessToken,
     refreshToken,
     expiresAt,

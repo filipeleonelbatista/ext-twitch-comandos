@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
-import { getBroadcasterToken, setBroadcasterToken, deleteBroadcasterToken } from '@/lib/ebs-store';
+import {
+  getBroadcasterToken,
+  setBroadcasterToken,
+  deleteBroadcasterToken,
+  getViewerToken,
+  setViewerToken,
+  deleteViewerToken,
+} from '@/lib/ebs-store';
 
 const EXTENSION_SECRET = process.env.EXTENSION_SECRET || '';
 const EXTENSION_CLIENT_ID = process.env.EXTENSION_CLIENT_ID || process.env.TWITCH_CLIENT_ID || '';
@@ -68,6 +75,21 @@ async function getValidBroadcasterToken(broadcasterId) {
   return stored.accessToken;
 }
 
+async function getValidViewerToken(userId) {
+  const stored = getViewerToken(userId);
+  if (!stored) return null;
+  if (stored.expiresAt && Date.now() >= stored.expiresAt - 60000) {
+    const refreshed = await refreshTwitchToken(stored.refreshToken);
+    if (refreshed) {
+      setViewerToken(userId, refreshed);
+      return refreshed.accessToken;
+    }
+    deleteViewerToken(userId);
+    return null;
+  }
+  return stored.accessToken;
+}
+
 export async function POST(request) {
   try {
     const auth = request.headers.get('authorization');
@@ -85,6 +107,10 @@ export async function POST(request) {
     if (!broadcasterId || !senderId) {
       return NextResponse.json({ error: 'Missing channel or user in JWT' }, { status: 400 });
     }
+    const viewerIdNumeric = String(payload.user_id ?? senderId).replace(/^U/i, '');
+    if (!viewerIdNumeric) {
+      return NextResponse.json({ error: 'Missing user id in JWT' }, { status: 400 });
+    }
 
     let body;
     try {
@@ -97,10 +123,16 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Missing message' }, { status: 400 });
     }
 
-    const accessToken = await getValidBroadcasterToken(broadcasterId);
+    const accessToken = await getValidViewerToken(viewerIdNumeric);
     if (!accessToken) {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+      const authUrl = `${baseUrl}/api/auth?type=viewer&channel_id=${encodeURIComponent(broadcasterId)}&state=${encodeURIComponent('viewer:' + broadcasterId)}`;
       return NextResponse.json(
-        { error: 'Broadcaster not linked. Open the extension config and complete OAuth (link account).' },
+        {
+          error: 'Autorize a extensão para enviar mensagens com seu nick.',
+          need_authorization: true,
+          auth_url: authUrl,
+        },
         { status: 403 }
       );
     }
@@ -121,7 +153,7 @@ export async function POST(request) {
       },
       body: JSON.stringify({
         broadcaster_id: String(broadcasterId),
-        sender_id: String(broadcasterId),
+        sender_id: viewerIdNumeric,
         message,
       }),
     });

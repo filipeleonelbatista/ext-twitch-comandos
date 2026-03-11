@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getSheetsConfig, getPollingIntervalMs, getSubCheckUrl } from '@/lib/config';
+import { getSheetsConfig, getPollingIntervalMs, getSubCheckUrl, getViewerAuthUrl } from '@/lib/config';
 import { fetchAllSheets, getUniqueCategories } from '@/lib/sheets';
 import { sendChatMessage } from '@/lib/twitch';
 import LoadingOverlay from '@/app/components/LoadingOverlay';
@@ -31,6 +31,8 @@ export default function PanelPage() {
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
   const [errorMsg, setErrorMsg] = useState('');
   const [rateLimitMsg, setRateLimitMsg] = useState('');
+  const [showAuthorizePrompt, setShowAuthorizePrompt] = useState(false);
+  const [authorizeUrl, setAuthorizeUrl] = useState('');
   const chatTimestamps = useRef([]);
   const rateLimitCooldownUntil = useRef(0);
   const pollTimer = useRef(null);
@@ -116,8 +118,21 @@ export default function PanelPage() {
       }
       const result = await sendChatMessage(auth, commandText);
       if (result.ok) {
+        setShowAuthorizePrompt(false);
         chatTimestamps.current.push(Date.now());
         if (chatTimestamps.current.length > CHAT_RATE_LIMIT) chatTimestamps.current.shift();
+        return;
+      }
+      if (result.status === 403 && result.needAuthorization && result.authUrl) {
+        setAuthorizeUrl(result.authUrl);
+        setShowAuthorizePrompt(true);
+        showRateLimit(0, 'Autorize a extensão para enviar mensagens com seu nick.');
+        return;
+      }
+      if (result.status === 403) {
+        setAuthorizeUrl(getViewerAuthUrl(auth.channelId));
+        setShowAuthorizePrompt(true);
+        showRateLimit(0, result.error || 'Autorize a extensão para enviar mensagens.');
         return;
       }
       if (result.status === 429) {
@@ -133,6 +148,11 @@ export default function PanelPage() {
     },
     [auth, canSendChat, showRateLimit]
   );
+
+  const openAuthorize = useCallback(() => {
+    const url = authorizeUrl || (auth ? getViewerAuthUrl(auth.channelId) : '');
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  }, [auth, authorizeUrl]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.Twitch?.ext) {
@@ -258,6 +278,15 @@ export default function PanelPage() {
 
       <div className="panel-content">
         {rateLimitMsg ? <div className="rate-limit-msg">{rateLimitMsg}</div> : null}
+
+        {showAuthorizePrompt && (
+          <div className="authorize-prompt">
+            <p>Para enviar comandos no chat com seu nick, autorize a extensão uma vez.</p>
+            <button type="button" className="command-btn authorize-btn" onClick={openAuthorize}>
+              Autorizar para enviar mensagens
+            </button>
+          </div>
+        )}
 
         {!isSubscriber && (
           <div className="subs-unlock subs-unlock--promo">
