@@ -30,6 +30,135 @@ body {
   max-width: 100%;
 }
 
+/* Mobile layout: header + scrollable content + footer */
+.panel-root--mobile {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 0;
+}
+
+.panel-root--mobile .panel-header {
+  flex-shrink: 0;
+  margin-bottom: 0;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.panel-header-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.panel-header-clear {
+  margin-left: auto;
+  background: var(--surface);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.panel-header-clear:hover {
+  background: rgba(145, 70, 255, 0.15);
+}
+
+.panel-header-search {
+  width: 100%;
+}
+
+.panel-search-input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.panel-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.panel-header-category {
+  width: 100%;
+}
+
+.panel-category-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.panel-category-select {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.panel-root--mobile .panel-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.panel-root--mobile .panel-footer {
+  flex-shrink: 0;
+  margin-top: 0;
+  padding: 10px 12px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.pagination-btn {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .panel-header {
   margin-bottom: 12px;
   padding-bottom: 8px;
@@ -131,6 +260,32 @@ body {
   margin-top: 12px;
 }
 
+/* Card em destaque no topo (não inscrito) – roxo + animação */
+.subs-unlock--promo {
+  margin-top: 0;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(145, 70, 255, 0.12) 0%, rgba(145, 70, 255, 0.04) 100%);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  font-weight: 500;
+  font-size: 14px;
+  box-shadow: 0 0 20px rgba(145, 70, 255, 0.15);
+  animation: subs-unlock-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes subs-unlock-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(145, 70, 255, 0.15);
+    border-color: var(--accent);
+  }
+  50% {
+    box-shadow: 0 0 28px rgba(145, 70, 255, 0.28);
+    border-color: var(--accent-hover);
+  }
+}
+
 .loading,
 .error-msg {
   padding: 16px;
@@ -148,7 +303,8 @@ body {
   margin-top: 8px;
 }
 
-.footer {
+.footer,
+.panel-footer {
   margin-top: 24px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
@@ -157,12 +313,14 @@ body {
   text-align: center;
 }
 
-.footer a {
+.footer a,
+.panel-footer a {
   color: var(--accent);
   text-decoration: none;
 }
 
-.footer a:hover {
+.footer a:hover,
+.panel-footer a:hover {
   text-decoration: underline;
 }
 

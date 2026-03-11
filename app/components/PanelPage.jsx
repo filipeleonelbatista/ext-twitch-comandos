@@ -7,6 +7,15 @@ import { sendChatMessage } from '@/lib/twitch';
 
 const CHAT_RATE_LIMIT = 12;
 const CHAT_RATE_WINDOW_MS = 60 * 1000;
+const ITEMS_PER_PAGE = 12;
+
+function matchSearch(row, query) {
+  if (!query || !query.trim()) return true;
+  const q = query.trim().toLowerCase();
+  const cmd = (row.command || '').toLowerCase();
+  const cat = (row.category || '').toLowerCase();
+  return cmd.includes(q) || cat.includes(q);
+}
 
 export default function PanelPage() {
   const [auth, setAuth] = useState(null);
@@ -15,6 +24,9 @@ export default function PanelPage() {
   const [subscribers, setSubscribers] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('Todas');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [followerPage, setFollowerPage] = useState(1);
+  const [subscriberPage, setSubscriberPage] = useState(1);
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
   const [errorMsg, setErrorMsg] = useState('');
   const [rateLimitMsg, setRateLimitMsg] = useState('');
@@ -54,10 +66,16 @@ export default function PanelPage() {
 
   const filterCommands = useCallback(
     (list) => {
-      if (!selectedCategory || selectedCategory === 'Todas') return list;
-      return list.filter((row) => row.category === selectedCategory);
+      let out = list;
+      if (selectedCategory && selectedCategory !== 'Todas') {
+        out = out.filter((row) => row.category === selectedCategory);
+      }
+      if (searchQuery && searchQuery.trim()) {
+        out = out.filter((row) => matchSearch(row, searchQuery));
+      }
+      return out;
     },
-    [selectedCategory]
+    [selectedCategory, searchQuery]
   );
 
   const showRateLimit = useCallback((seconds, customMsg) => {
@@ -162,65 +180,165 @@ export default function PanelPage() {
   const allCategories = ['Todas', ...categories];
   const disabled = !canSendChat() || Date.now() < rateLimitCooldownUntil.current;
 
+  const totalFollowerPages = Math.max(1, Math.ceil(filteredFollowers.length / ITEMS_PER_PAGE));
+  const totalSubscriberPages = Math.max(1, Math.ceil(filteredSubscribers.length / ITEMS_PER_PAGE));
+  const safeFollowerPage = Math.min(followerPage, totalFollowerPages) || 1;
+  const safeSubscriberPage = Math.min(subscriberPage, totalSubscriberPages) || 1;
+  const paginatedFollowers = filteredFollowers.slice(
+    (safeFollowerPage - 1) * ITEMS_PER_PAGE,
+    safeFollowerPage * ITEMS_PER_PAGE
+  );
+  const paginatedSubscribers = filteredSubscribers.slice(
+    (safeSubscriberPage - 1) * ITEMS_PER_PAGE,
+    safeSubscriberPage * ITEMS_PER_PAGE
+  );
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setFollowerPage(1);
+    setSubscriberPage(1);
+  };
+
   return (
-    <div className="panel-root">
-      <div className="panel-header">
-        <img src="/assets/icon_100x100.png" alt="" className="panel-header-icon" />
-        <h1>Comandos de áudio</h1>
-      </div>
-
-      <div className="filters">
-        {allCategories.map((cat) => (
-          <button
-            key={cat}
-            type="button"
-            className={`filter-btn ${selectedCategory === cat ? 'active' : ''}`}
-            onClick={() => setSelectedCategory(cat)}
+    <div className="panel-root panel-root--mobile">
+      <header className="panel-header">
+        <div className="panel-header-top">
+          <img src="/assets/icon_100x100.png" alt="" className="panel-header-icon" />
+          <h1>Comandos de áudio</h1>
+          {searchQuery.trim() ? (
+            <button type="button" className="panel-header-clear" onClick={handleClearSearch}>
+              Limpar
+            </button>
+          ) : null}
+        </div>
+        <div className="panel-header-search">
+          <input
+            type="search"
+            placeholder="Pesquisar por comando ou categoria..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setFollowerPage(1);
+              setSubscriberPage(1);
+            }}
+            className="panel-search-input"
+            aria-label="Pesquisar"
+          />
+        </div>
+        <div className="panel-header-category">
+          <label htmlFor="category-select" className="panel-category-label">
+            Categoria
+          </label>
+          <select
+            id="category-select"
+            value={selectedCategory}
+            onChange={(e) => {
+              setSelectedCategory(e.target.value);
+              setFollowerPage(1);
+              setSubscriberPage(1);
+            }}
+            className="panel-category-select"
           >
-            {cat}
-          </button>
-        ))}
-      </div>
-
-      {rateLimitMsg ? <div className="rate-limit-msg">{rateLimitMsg}</div> : null}
-
-      <div className="section-title">Comandos (todos)</div>
-      <div className="commands-grid">
-        {filteredFollowers.map(({ command }, i) => (
-          <button
-            key={`f-${i}-${command}`}
-            type="button"
-            className="command-btn"
-            disabled={disabled}
-            onClick={() => handleCommandClick(command)}
-          >
-            {command}
-          </button>
-        ))}
-      </div>
-
-      {isSubscriber ? (
-        <>
-          <div className="section-title">Áudios (inscritos)</div>
-          <div className="commands-grid">
-            {filteredSubscribers.map(({ command }, i) => (
-              <button
-                key={`s-${i}-${command}`}
-                type="button"
-                className="command-btn"
-                disabled={disabled}
-                onClick={() => handleCommandClick(command)}
-              >
-                {command}
-              </button>
+            {allCategories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
             ))}
-          </div>
-        </>
-      ) : (
-        <div className="subs-unlock">Desbloqueie os áudios sendo inscrito no canal.</div>
-      )}
+          </select>
+        </div>
+      </header>
 
-      <div className="footer">
+      <div className="panel-content">
+        {rateLimitMsg ? <div className="rate-limit-msg">{rateLimitMsg}</div> : null}
+
+        {!isSubscriber && (
+          <div className="subs-unlock subs-unlock--promo">
+            Desbloqueie os áudios sendo inscrito no canal.
+          </div>
+        )}
+
+        <div className="section-title">Comandos (todos)</div>
+        <div className="commands-grid">
+          {paginatedFollowers.map(({ command }, i) => (
+            <button
+              key={`f-${i}-${command}`}
+              type="button"
+              className="command-btn"
+              disabled={disabled}
+              onClick={() => handleCommandClick(command)}
+            >
+              {command}
+            </button>
+          ))}
+        </div>
+        {filteredFollowers.length > ITEMS_PER_PAGE && (
+          <div className="pagination">
+            <button
+              type="button"
+              className="pagination-btn"
+              disabled={safeFollowerPage <= 1}
+              onClick={() => setFollowerPage((p) => Math.max(1, p - 1))}
+            >
+              Anterior
+            </button>
+            <span className="pagination-info">
+              Página {safeFollowerPage} de {totalFollowerPages}
+            </span>
+            <button
+              type="button"
+              className="pagination-btn"
+              disabled={safeFollowerPage >= totalFollowerPages}
+              onClick={() => setFollowerPage((p) => Math.min(totalFollowerPages, p + 1))}
+            >
+              Próxima
+            </button>
+          </div>
+        )}
+
+        {isSubscriber ? (
+          <>
+            <div className="section-title">Áudios (inscritos)</div>
+            <div className="commands-grid">
+              {paginatedSubscribers.map(({ command }, i) => (
+                <button
+                  key={`s-${i}-${command}`}
+                  type="button"
+                  className="command-btn"
+                  disabled={disabled}
+                  onClick={() => handleCommandClick(command)}
+                >
+                  {command}
+                </button>
+              ))}
+            </div>
+            {filteredSubscribers.length > ITEMS_PER_PAGE && (
+              <div className="pagination">
+                <button
+                  type="button"
+                  className="pagination-btn"
+                  disabled={safeSubscriberPage <= 1}
+                  onClick={() => setSubscriberPage((p) => Math.max(1, p - 1))}
+                >
+                  Anterior
+                </button>
+                <span className="pagination-info">
+                  Página {safeSubscriberPage} de {totalSubscriberPages}
+                </span>
+                <button
+                  type="button"
+                  className="pagination-btn"
+                  disabled={safeSubscriberPage >= totalSubscriberPages}
+                  onClick={() => setSubscriberPage((p) => Math.min(totalSubscriberPages, p + 1))}
+                >
+                  Próxima
+                </button>
+              </div>
+            )}
+          </>
+        ) : null}
+      </div>
+
+      <footer className="panel-footer">
         Feito pelo maior exemplo dessa live ·{' '}
         <a
           href="https://www.linkedin.com/in/filipeleonelbatista"
@@ -230,7 +348,7 @@ export default function PanelPage() {
           Filipe Leonel Batista
         </a>{' '}
         (LinkedIn)
-      </div>
+      </footer>
     </div>
   );
 }
