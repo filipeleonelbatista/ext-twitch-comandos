@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { getSheetsConfig, getPollingIntervalMs, getSubCheckUrl } from '@/lib/config';
 import { fetchAllSheets, getUniqueCategories } from '@/lib/sheets';
 import { sendChatMessage } from '@/lib/twitch';
+import LoadingOverlay from '@/app/components/LoadingOverlay';
 
 const CHAT_RATE_LIMIT = 12;
 const CHAT_RATE_WINDOW_MS = 60 * 1000;
@@ -172,7 +173,7 @@ export default function PanelPage() {
   }
 
   if (status === 'loading') {
-    return <div className="loading">Carregando...</div>;
+    return <LoadingOverlay />;
   }
 
   const filteredFollowers = filterCommands(followers);

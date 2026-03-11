@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import LoadingOverlay from '@/app/components/LoadingOverlay';
 
 export default function LiveConfigPage() {
   const [auth, setAuth] = useState(null);
@@ -21,7 +22,7 @@ export default function LiveConfigPage() {
           Ações executadas pelo streamer durante a live (ex.: criar enquete, ajustes rápidos). Esta página pode ser expandida com mais opções.
         </p>
       )}
-      {!auth && <p className="loading">Carregando...</p>}
+      {!auth && <LoadingOverlay />}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import { useState, useEffect, Suspense } from 'react';
 import PanelPage from '@/app/components/PanelPage';
+import LoadingOverlay from '@/app/components/LoadingOverlay';
 
 function ConfigView() {
   const [ebsBaseUrl, setEbsBaseUrl] = useState('');
@@ -74,7 +75,7 @@ function IndexContent() {
 
 export default function IndexPage() {
   return (
-    <Suspense fallback={<div className="loading">Carregando...</div>}>
+    <Suspense fallback={<LoadingOverlay />}>
       <IndexContent />
     </Suspense>
   );
