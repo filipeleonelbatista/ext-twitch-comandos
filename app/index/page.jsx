@@ -65,7 +65,8 @@ function ConfigView() {
 
 function IndexContent() {
   const searchParams = useSearchParams();
-  const isConfigView = searchParams.get('view') === 'config';
+  const isConfigView =
+    searchParams.get('view') === 'config' || searchParams.get('mode') === 'config';
 
   if (isConfigView) return <ConfigView />;
   return <PanelPage />;
