@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
+import { getBroadcasterToken, setBroadcasterToken, deleteBroadcasterToken } from '@/lib/ebs-store';
 
 const EXTENSION_SECRET = process.env.EXTENSION_SECRET || '';
 const EXTENSION_CLIENT_ID = process.env.EXTENSION_CLIENT_ID || process.env.TWITCH_CLIENT_ID || '';
@@ -31,6 +32,42 @@ async function verifyFrontendJwt(token) {
   }
 }
 
+async function refreshTwitchToken(refreshToken) {
+  const res = await fetch('https://id.twitch.tv/oauth2/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: process.env.TWITCH_CLIENT_ID || '',
+      client_secret: process.env.TWITCH_CLIENT_SECRET || '',
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    }),
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const expiresAt = Date.now() + (data.expires_in || 0) * 1000;
+  return {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token || refreshToken,
+    expiresAt,
+  };
+}
+
+async function getValidBroadcasterToken(broadcasterId) {
+  const stored = getBroadcasterToken(broadcasterId);
+  if (!stored) return null;
+  if (stored.expiresAt && Date.now() >= stored.expiresAt - 60000) {
+    const refreshed = await refreshTwitchToken(stored.refreshToken);
+    if (refreshed) {
+      setBroadcasterToken(broadcasterId, refreshed);
+      return refreshed.accessToken;
+    }
+    deleteBroadcasterToken(broadcasterId);
+    return null;
+  }
+  return stored.accessToken;
+}
+
 export async function POST(request) {
   try {
     const auth = request.headers.get('authorization');
@@ -48,7 +85,6 @@ export async function POST(request) {
     if (!broadcasterId || !senderId) {
       return NextResponse.json({ error: 'Missing channel or user in JWT' }, { status: 400 });
     }
-    const senderIdNumeric = String(payload.user_id ?? senderId);
 
     let body;
     try {
@@ -61,24 +97,17 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Missing message' }, { status: 400 });
     }
 
-    const helixToken = typeof body.helixToken === 'string' ? body.helixToken.trim() : '';
-    if (!helixToken) {
+    const accessToken = await getValidBroadcasterToken(broadcasterId);
+    if (!accessToken) {
       return NextResponse.json(
-        { error: 'Missing helixToken. Enable "Chat in Extensions" in the Extension Manager and send helixToken from the client.' },
-        { status: 400 }
+        { error: 'Broadcaster not linked. Open the extension config and complete OAuth (link account).' },
+        { status: 403 }
       );
     }
 
-    const secret = getExtensionSecret();
-    if (!secret) {
-      return NextResponse.json(
-        { error: 'EBS JWT not configured', detail: 'EXTENSION_SECRET is not set' },
-        { status: 500 }
-      );
-    }
     if (!EXTENSION_CLIENT_ID) {
       return NextResponse.json(
-        { error: 'EBS JWT not configured', detail: 'EXTENSION_CLIENT_ID (or TWITCH_CLIENT_ID) is not set' },
+        { error: 'EBS not configured', detail: 'EXTENSION_CLIENT_ID (or TWITCH_CLIENT_ID) is not set' },
         { status: 500 }
       );
     }
@@ -87,12 +116,12 @@ export async function POST(request) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Extension ${helixToken}`,
+        Authorization: `Bearer ${accessToken}`,
         'Client-Id': EXTENSION_CLIENT_ID,
       },
       body: JSON.stringify({
         broadcaster_id: String(broadcasterId),
-        sender_id: senderIdNumeric,
+        sender_id: String(broadcasterId),
         message,
       }),
     });

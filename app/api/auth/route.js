@@ -7,7 +7,7 @@ export async function GET(request) {
   const state = searchParams.get('state') || '';
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
   const redirectUri = `${baseUrl}/api/auth/callback`;
-  const scope = 'channel:read:subscriptions';
+  const scope = 'channel:read:subscriptions user:write:chat';
   const authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${encodeURIComponent(TWITCH_CLIENT_ID)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}`;
   return NextResponse.redirect(authUrl);
 }
