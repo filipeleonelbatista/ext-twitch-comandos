@@ -9,7 +9,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="pt-BR">
       <head>
-        <script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js" async />
+        <script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js" />
       </head>
       <body>{children}</body>
     </html>
