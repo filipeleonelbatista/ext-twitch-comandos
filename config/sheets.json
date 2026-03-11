@@ -1,0 +1,8 @@
+{
+  "sheets": {
+    "followers": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ6oLOtDazBXQgSf2ldgUIt3xqnr6erVSdg72LCL7tImcYVFbbQOXZVt2FqzKNjg_8u3YZLpU8onSCt/pub?output=csv&gid=1478494058",
+    "subscribers": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ6oLOtDazBXQgSf2ldgUIt3xqnr6erVSdg72LCL7tImcYVFbbQOXZVt2FqzKNjg_8u3YZLpU8onSCt/pub?output=csv&gid=966441261"
+  },
+  "pollingIntervalMinutes": 3,
+  "ebsBaseUrl": "http://localhost:3001"
+}

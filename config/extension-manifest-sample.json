@@ -1,0 +1,10 @@
+{
+  "description": "Sample manifest for reference. Configure the extension in Twitch Developer Console (https://dev.twitch.tv/console/extensions). Set Panel Viewer Path to your hosted index.html, enable Chat in Extensions, set EBS URL to your EBS base URL.",
+  "panel": {
+    "viewerPath": "index.html",
+    "height": 500
+  },
+  "capabilities": {
+    "chat": true
+  }
+}
