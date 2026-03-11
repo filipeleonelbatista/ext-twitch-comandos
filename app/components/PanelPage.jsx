@@ -125,6 +125,10 @@ export default function PanelPage() {
         showRateLimit(60);
         return;
       }
+      if (result.status === 401) {
+        showRateLimit(0, 'Ative "Chat in Extensions" na versão da extensão no Twitch Developer Console.');
+        return;
+      }
       showRateLimit(0, result.error || `Erro ${result.status}`);
     },
     [auth, canSendChat, showRateLimit]
