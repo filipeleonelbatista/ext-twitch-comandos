@@ -33,6 +33,8 @@ export default function PanelPage() {
   const [rateLimitMsg, setRateLimitMsg] = useState('');
   const [showAuthorizePrompt, setShowAuthorizePrompt] = useState(false);
   const [authorizeUrl, setAuthorizeUrl] = useState('');
+  const [userDisplayName, setUserDisplayName] = useState('');
+  const [userProfileImageUrl, setUserProfileImageUrl] = useState('');
   const chatTimestamps = useRef([]);
   const rateLimitCooldownUntil = useRef(0);
   const pollTimer = useRef(null);
@@ -163,9 +165,29 @@ export default function PanelPage() {
 
     window.Twitch.ext.onAuthorized(async (a) => {
       setAuth(a);
+      setUserDisplayName('');
+      setUserProfileImageUrl('');
       try {
         sessionStorage.setItem('usermetadata:ext:cololono', JSON.stringify(a));
       } catch (_) {}
+      if (a.helixToken && a.clientId) {
+        try {
+          const res = await fetch('https://api.twitch.tv/helix/users', {
+            headers: {
+              Authorization: `Extension ${a.helixToken}`,
+              'Client-Id': a.clientId,
+            },
+          });
+          if (res.ok) {
+            const json = await res.json();
+            const user = json.data?.[0];
+            if (user) {
+              setUserDisplayName(user.display_name || user.login || '');
+              setUserProfileImageUrl(user.profile_image_url || '');
+            }
+          }
+        } catch (_) {}
+      }
       setStatus('loading');
       try {
         const sub = await callSubCheck(a.token);
@@ -230,6 +252,18 @@ export default function PanelPage() {
   return (
     <div className="panel-root panel-root--mobile">
       <header className="panel-header">
+        {(userDisplayName || userProfileImageUrl) && (
+          <div className="panel-header-user">
+            <img
+              src={userProfileImageUrl || '/assets/icon_100x100.png'}
+              alt=""
+              className="panel-header-user-avatar"
+              width={28}
+              height={28}
+            />
+            <span className="panel-header-user-name">{userDisplayName || 'Twitch'}</span>
+          </div>
+        )}
         <div className="panel-header-top">
           <img src="/assets/icon_100x100.png" alt="" className="panel-header-icon" />
           <h1>Comandos de áudio</h1>
