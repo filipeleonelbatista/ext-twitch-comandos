@@ -15,13 +15,20 @@ Instruções para configurar e publicar a extensão no canal **colonogamer** e m
 ## 2. Configuração no Twitch Developer Console
 
 1. Acesse [Extensions](https://dev.twitch.tv/console/extensions) e selecione a extensão.
-2. **Panel**  
-   - **Panel Viewer Path**: URL da aplicação (ex.: `https://seu-dominio.vercel.app`). A página inicial do Next.js é o panel.
-3. **Capabilities**  
-   - Ative **Chat in Extensions** (obrigatório para enviar mensagens no chat).  
-   - **Extension Backend Service (EBS)**: use a **mesma URL** do panel (ex.: `https://seu-dominio.vercel.app`). As rotas do backend ficam em `/api/sub-check`, `/api/auth`, `/api/auth/callback`.
-4. **Versão**  
-   - Não é necessário fazer upload de zip: o panel é servido pela URL. Teste em “Local Test” antes de enviar para revisão.
+2. **URI da base de teste** (teste local): use a URL da aplicação com barra final (ex.: `https://ext-twitch-comandos.vercel.app/`).
+3. **Panel**
+   - **Caminho do espectador do painel**: `index` (URL final: `.../index`).
+   - **Altura do painel**: 420 px.
+4. **Vídeo - Tela cheia**: **Caminho do espectador**: `video_overlay.html` (URL final: `.../video_overlay.html`).
+5. **Vídeo - Componente**: **Caminho do espectador**: `video_component.html`. Parâmetros de dimensionamento: altura de referência 30%, proporção 3:2, escala automática, pixels de escala 1024.
+6. **Disp. móveis**: **Caminho**: `index` (mesmo do painel).
+7. **Caminho de configuração**: `index` (página de configuração do streamer no gerenciador). Para exibir a UI de configuração (ex.: URL do EBS), use o path `index?view=config` no Console, se permitido.
+8. **Caminho de configuração ao vivo**: `live_config` (URL final: `.../live_config`).
+9. **Capabilities**
+   - Ative **Chat in Extensions** (obrigatório para enviar mensagens no chat).
+   - **Extension Backend Service (EBS)**: use a **mesma URL** do app (ex.: `https://ext-twitch-comandos.vercel.app`). As rotas do backend ficam em `/api/sub-check`, `/api/auth`, `/api/auth/callback`.
+10. **Versão**
+   - Não é necessário fazer upload de zip: os ativos são servidos pela URL. Teste em “Local Test” antes de enviar para revisão.
 
 ---
 
@@ -83,8 +90,14 @@ A extensão **só envia o texto do comando** para o chat (ex.: `!comando2`). Que
 
 | Item | Onde |
 |------|------|
+| URI da base de teste | Twitch Console → Versão → ex.: `https://ext-twitch-comandos.vercel.app/` |
+| Panel viewer path | `index` — Altura: 420 px |
+| Video overlay path | `video_overlay.html` |
+| Video component path | `video_component.html` (30%, 3:2, 1024 px) |
+| Mobile path | `index` |
+| Config path | `index` (ou `index?view=config` para UI de config) |
+| Live config path | `live_config` |
 | URLs das planilhas CSV | `lib/config.js` |
-| Panel Viewer Path | Twitch Console → extensão → Panel → URL do app |
 | Chat na extensão | Twitch Console → Capabilities → Chat in Extensions |
 | EBS URL | Twitch Console → EBS → mesma URL do app |
 | Variáveis de ambiente | `.env` (EXTENSION_SECRET, TWITCH_*, NEXT_PUBLIC_APP_URL) |

@@ -34,6 +34,16 @@ body {
   margin-bottom: 12px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.panel-header-icon {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .panel-header h1 {
@@ -154,4 +164,109 @@ body {
 
 .footer a:hover {
   text-decoration: underline;
+}
+
+/* Config view (index?view=config) */
+.config-view .config-desc {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 360px;
+}
+
+.config-form label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.config-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.config-input::placeholder {
+  color: var(--text-muted);
+}
+
+.config-save-btn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  align-self: flex-start;
+}
+
+.config-save-btn:hover {
+  background: var(--accent-hover);
+}
+
+.config-saved {
+  margin-top: 12px;
+  color: var(--success);
+  font-size: 13px;
+}
+
+/* Video overlay (fullscreen) – transparent background */
+.video-overlay-root {
+  position: relative;
+  min-height: 100vh;
+  background: transparent;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 12px;
+  gap: 8px;
+}
+
+.video-overlay-icon {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.video-overlay-label {
+  font-size: 14px;
+  color: var(--text);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Video component – fixed aspect 3:2, scale 1024px */
+.video-component-root {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  background: rgba(14, 14, 16, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.video-component-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.video-component-label {
+  font-size: 13px;
+  color: var(--text);
 }
