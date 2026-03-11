@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { jwtVerify, SignJWT } from 'jose';
+import { jwtVerify } from 'jose';
 
 const EXTENSION_SECRET = process.env.EXTENSION_SECRET || '';
 const EXTENSION_CLIENT_ID = process.env.EXTENSION_CLIENT_ID || process.env.TWITCH_CLIENT_ID || '';
@@ -29,21 +29,6 @@ async function verifyFrontendJwt(token) {
   } catch {
     return null;
   }
-}
-
-/** EBS JWT for Send Extension Chat Message: Twitch expects this signed with Extension Secret. */
-async function signEbsChatJwt(broadcasterId) {
-  const secret = getExtensionSecret();
-  if (!secret) return null;
-  const exp = Math.floor(Date.now() / 1000) + 60;
-  const jwt = await new SignJWT({
-    user_id: String(broadcasterId),
-    role: 'broadcaster',
-  })
-    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
-    .setExpirationTime(exp)
-    .sign(secret);
-  return jwt;
 }
 
 export async function POST(request) {
@@ -76,6 +61,14 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Missing message' }, { status: 400 });
     }
 
+    const helixToken = typeof body.helixToken === 'string' ? body.helixToken.trim() : '';
+    if (!helixToken) {
+      return NextResponse.json(
+        { error: 'Missing helixToken. Enable "Chat in Extensions" in the Extension Manager and send helixToken from the client.' },
+        { status: 400 }
+      );
+    }
+
     const secret = getExtensionSecret();
     if (!secret) {
       return NextResponse.json(
@@ -90,16 +83,11 @@ export async function POST(request) {
       );
     }
 
-    const ebsJwt = await signEbsChatJwt(broadcasterId);
-    if (!ebsJwt) {
-      return NextResponse.json({ error: 'EBS JWT signing failed' }, { status: 500 });
-    }
-
     const res = await fetch('https://api.twitch.tv/helix/chat/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Extension ${ebsJwt}`,
+        Authorization: `Extension ${helixToken}`,
         'Client-Id': EXTENSION_CLIENT_ID,
       },
       body: JSON.stringify({
