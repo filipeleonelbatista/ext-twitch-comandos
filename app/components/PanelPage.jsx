@@ -6,6 +6,26 @@ import { fetchAllSheets, getUniqueCategories } from '@/lib/sheets';
 import { sendChatMessage } from '@/lib/twitch';
 import LoadingOverlay from '@/app/components/LoadingOverlay';
 
+const USER_PROFILE_STORAGE_KEY = 'usermetadata:ext:cololono:profile';
+
+function loadStoredProfile() {
+  try {
+    const raw = sessionStorage.getItem(USER_PROFILE_STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data && (data.displayName || data.profileImageUrl)) return data;
+  } catch (_) {}
+  return null;
+}
+
+function saveProfileToStorage(displayName, profileImageUrl) {
+  try {
+    sessionStorage.setItem(
+      USER_PROFILE_STORAGE_KEY,
+      JSON.stringify({ displayName: displayName || '', profileImageUrl: profileImageUrl || '' })
+    );
+  } catch (_) {}
+}
 const CHAT_RATE_LIMIT = 12;
 const CHAT_RATE_WINDOW_MS = 60 * 1000;
 const ITEMS_PER_PAGE = 12;
@@ -165,8 +185,14 @@ export default function PanelPage() {
 
     window.Twitch.ext.onAuthorized(async (a) => {
       setAuth(a);
-      setUserDisplayName('');
-      setUserProfileImageUrl('');
+      const stored = loadStoredProfile();
+      if (stored) {
+        setUserDisplayName(stored.displayName || '');
+        setUserProfileImageUrl(stored.profileImageUrl || '');
+      } else {
+        setUserDisplayName('');
+        setUserProfileImageUrl('');
+      }
       try {
         sessionStorage.setItem('usermetadata:ext:cololono', JSON.stringify(a));
       } catch (_) {}
@@ -182,8 +208,11 @@ export default function PanelPage() {
             const json = await res.json();
             const user = json.data?.[0];
             if (user) {
-              setUserDisplayName(user.display_name || user.login || '');
-              setUserProfileImageUrl(user.profile_image_url || '');
+              const name = user.display_name || user.login || '';
+              const img = user.profile_image_url || '';
+              setUserDisplayName(name);
+              setUserProfileImageUrl(img);
+              saveProfileToStorage(name, img);
             }
           }
         } catch (_) {}
