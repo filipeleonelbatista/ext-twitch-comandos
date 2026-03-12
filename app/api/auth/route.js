@@ -11,11 +11,9 @@ function getRedirectUri(request) {
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const state = searchParams.get('state') || '';
-  const type = searchParams.get('type') || ''; // 'viewer' | broadcaster
   const redirectUri = getRedirectUri(request);
 
-  const isViewer = type === 'viewer';
-  const scope = isViewer ? 'user:write:chat' : 'channel:read:subscriptions user:write:chat';
+  const scope = 'channel:read:subscriptions moderation:read';
   const authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${encodeURIComponent(TWITCH_CLIENT_ID)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}`;
   return NextResponse.redirect(authUrl);
 }

@@ -11,6 +11,9 @@ out
 build
 dist
 
+# Firebase service account key (never commit)
+*-firebase-adminsdk-*.json
+
 # Environment
 .env
 .env.local

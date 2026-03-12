@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { setBroadcasterToken, setViewerToken } from '@/lib/ebs-store';
+import { setBroadcasterToken } from '@/lib/ebs-store';
 
 const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID || '';
 const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET || '';
@@ -18,7 +18,6 @@ export async function GET(request) {
   const errorDescription = searchParams.get('error_description') || '';
 
   if (!code) {
-    const isViewer = state.startsWith('viewer:');
     const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin || '').replace(/\/$/, '');
     const successPath = '/auth/success';
     const errorMsg = error === 'access_denied'
@@ -26,7 +25,7 @@ export async function GET(request) {
       : error
         ? `${error}${errorDescription ? ': ' + decodeURIComponent(errorDescription) : ''}`
         : 'Nenhum código recebido. Feche esta aba e tente autorizar de novo pela extensão.';
-    const redirectUrl = `${baseUrl}${successPath}?type=${isViewer ? 'viewer' : 'broadcaster'}&error=${encodeURIComponent(errorMsg)}`;
+    const redirectUrl = `${baseUrl}${successPath}?error=${encodeURIComponent(errorMsg)}`;
     return NextResponse.redirect(redirectUrl);
   }
 
@@ -71,24 +70,14 @@ export async function GET(request) {
     return new NextResponse('No user in response', { status: 400 });
   }
 
-  const isViewer = state.startsWith('viewer:');
-  if (isViewer) {
-    setViewerToken(userId, {
-      accessToken,
-      refreshToken,
-      expiresAt,
-    });
-    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin || '').replace(/\/$/, '');
-    const successUrl = `${baseUrl}/auth/success?type=viewer`;
-    return NextResponse.redirect(successUrl);
-  }
-
   setBroadcasterToken(userId, {
     accessToken,
     refreshToken,
     expiresAt,
   });
 
-  const redirectTo = state || 'https://dev.twitch.tv/console/extensions';
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin || '').replace(/\/$/, '');
+  const successUrl = `${baseUrl}/auth/success`;
+  const redirectTo = state ? (state.startsWith('http') ? state : `${baseUrl}${state}`) : successUrl;
   return NextResponse.redirect(redirectTo);
 }

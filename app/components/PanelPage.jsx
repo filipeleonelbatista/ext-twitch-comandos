@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getSheetsConfig, getPollingIntervalMs, getSubCheckUrl, getViewerAuthUrl } from '@/lib/config';
+import { getSheetsConfig, getPollingIntervalMs, getSubCheckUrl, getChannelSettingsUrl } from '@/lib/config';
 import { fetchAllSheets, getUniqueCategories } from '@/lib/sheets';
 import { sendChatMessage } from '@/lib/twitch';
 import LoadingOverlay from '@/app/components/LoadingOverlay';
@@ -26,7 +26,7 @@ function saveProfileToStorage(displayName, profileImageUrl) {
     );
   } catch (_) {}
 }
-const CHAT_RATE_LIMIT = 12;
+const DEFAULT_RATE_LIMIT = 12;
 const CHAT_RATE_WINDOW_MS = 60 * 1000;
 const ITEMS_PER_PAGE = 12;
 
@@ -51,20 +51,24 @@ export default function PanelPage() {
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
   const [errorMsg, setErrorMsg] = useState('');
   const [rateLimitMsg, setRateLimitMsg] = useState('');
-  const [showAuthorizePrompt, setShowAuthorizePrompt] = useState(false);
-  const [authorizeUrl, setAuthorizeUrl] = useState('');
+  const [isChatEnabled, setIsChatEnabled] = useState(false);
+  const [broadcasterDisplayName, setBroadcasterDisplayName] = useState('');
   const [userDisplayName, setUserDisplayName] = useState('');
   const [userProfileImageUrl, setUserProfileImageUrl] = useState('');
+  const [channelSettings, setChannelSettings] = useState(null);
+  const [customCommands, setCustomCommands] = useState([]);
   const chatTimestamps = useRef([]);
   const rateLimitCooldownUntil = useRef(0);
   const pollTimer = useRef(null);
+
+  const rateLimit = channelSettings?.rateLimitPerMinute ?? DEFAULT_RATE_LIMIT;
 
   const canSendChat = useCallback(() => {
     const now = Date.now();
     if (now < rateLimitCooldownUntil.current) return false;
     const recent = chatTimestamps.current.filter((t) => now - t < CHAT_RATE_WINDOW_MS);
-    return recent.length < CHAT_RATE_LIMIT;
-  }, []);
+    return recent.length < rateLimit;
+  }, [rateLimit]);
 
   const callSubCheck = useCallback(async (token) => {
     const url = getSubCheckUrl();
@@ -89,9 +93,23 @@ export default function PanelPage() {
     setCategories(getUniqueCategories(f, s));
   }, []);
 
+  const commandsUrl = getChannelSettingsUrl().replace(/\/channel-settings\/?$/, '') + '/channel-settings/commands';
+
   const filterCommands = useCallback(
-    (list) => {
+    (list, subsOnly = false) => {
       let out = list;
+      const allowed = channelSettings?.allowedCategories;
+      if (Array.isArray(allowed) && allowed.length > 0) {
+        const allowedSet = new Set(allowed.map((c) => c.trim().toLowerCase()));
+        out = out.filter((row) => allowedSet.has((row.category || '').trim().toLowerCase()));
+      }
+      if (subsOnly) {
+        const subsCat = channelSettings?.subsOnlyCategories;
+        if (Array.isArray(subsCat) && subsCat.length > 0) {
+          const subsSet = new Set(subsCat.map((c) => c.trim().toLowerCase()));
+          out = out.filter((row) => subsSet.has((row.category || '').trim().toLowerCase()));
+        }
+      }
       if (selectedCategory && selectedCategory !== 'Todas') {
         out = out.filter((row) => row.category === selectedCategory);
       }
@@ -100,7 +118,7 @@ export default function PanelPage() {
       }
       return out;
     },
-    [selectedCategory, searchQuery]
+    [channelSettings, selectedCategory, searchQuery]
   );
 
   const showRateLimit = useCallback((seconds, customMsg) => {
@@ -125,36 +143,25 @@ export default function PanelPage() {
   const handleCommandClick = useCallback(
     async (commandText) => {
       if (!auth) return;
+      if (!isChatEnabled) return;
       const now = Date.now();
       if (now < rateLimitCooldownUntil.current) {
         showRateLimit(Math.ceil((rateLimitCooldownUntil.current - now) / 1000));
         return;
       }
       if (!canSendChat()) {
-        const oldest = chatTimestamps.current[chatTimestamps.current.length - CHAT_RATE_LIMIT];
+        const idx = chatTimestamps.current.length - rateLimit;
+        const oldest = idx >= 0 ? chatTimestamps.current[idx] : Date.now();
         const elapsed = Date.now() - oldest;
         const s = Math.ceil((CHAT_RATE_WINDOW_MS - elapsed) / 1000);
         rateLimitCooldownUntil.current = Date.now() + s * 1000;
         showRateLimit(s);
         return;
       }
-      const result = await sendChatMessage(auth, commandText);
+      const result = await sendChatMessage(auth, commandText, broadcasterDisplayName, userDisplayName);
       if (result.ok) {
-        setShowAuthorizePrompt(false);
         chatTimestamps.current.push(Date.now());
-        if (chatTimestamps.current.length > CHAT_RATE_LIMIT) chatTimestamps.current.shift();
-        return;
-      }
-      if (result.status === 403 && result.needAuthorization && result.authUrl) {
-        setAuthorizeUrl(result.authUrl);
-        setShowAuthorizePrompt(true);
-        showRateLimit(0, 'Autorize a extensão para enviar mensagens com seu nick.');
-        return;
-      }
-      if (result.status === 403) {
-        setAuthorizeUrl(getViewerAuthUrl(auth.channelId));
-        setShowAuthorizePrompt(true);
-        showRateLimit(0, result.error || 'Autorize a extensão para enviar mensagens.');
+        if (chatTimestamps.current.length > rateLimit) chatTimestamps.current.shift();
         return;
       }
       if (result.status === 429) {
@@ -168,13 +175,8 @@ export default function PanelPage() {
       }
       showRateLimit(0, result.error || `Erro ${result.status}`);
     },
-    [auth, canSendChat, showRateLimit]
+    [auth, isChatEnabled, broadcasterDisplayName, userDisplayName, canSendChat, showRateLimit, rateLimit]
   );
-
-  const openAuthorize = useCallback(() => {
-    const url = authorizeUrl || (auth ? getViewerAuthUrl(auth.channelId) : '');
-    if (url) window.open(url, 'twitch_ext_auth', 'width=520,height=640,scrollbars=yes');
-  }, [auth, authorizeUrl]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.Twitch?.ext) {
@@ -185,6 +187,7 @@ export default function PanelPage() {
 
     window.Twitch.ext.onAuthorized(async (a) => {
       setAuth(a);
+      setIsChatEnabled(!!window.Twitch.ext?.features?.isChatEnabled);
       const stored = loadStoredProfile();
       if (stored) {
         setUserDisplayName(stored.displayName || '');
@@ -216,8 +219,48 @@ export default function PanelPage() {
             }
           }
         } catch (_) {}
+        try {
+          const broadcasterRes = await fetch(
+            `https://api.twitch.tv/helix/users?id=${encodeURIComponent(a.channelId || '')}`,
+            {
+              headers: {
+                Authorization: `Extension ${a.helixToken}`,
+                'Client-Id': a.clientId,
+              },
+            }
+          );
+          if (broadcasterRes.ok) {
+            const broadcasterJson = await broadcasterRes.json();
+            const broadcaster = broadcasterJson.data?.[0];
+            if (broadcaster) {
+              setBroadcasterDisplayName(broadcaster.display_name || broadcaster.login || '');
+            }
+          }
+        } catch (_) {}
       }
       setStatus('loading');
+      try {
+        const settingsUrl = getChannelSettingsUrl();
+        const [settingsRes, commandsRes] = await Promise.all([
+          fetch(settingsUrl, { headers: { Authorization: `Bearer ${a.token}` } }),
+          fetch(commandsUrl, { headers: { Authorization: `Bearer ${a.token}` } }),
+        ]);
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json();
+          setChannelSettings(settingsData);
+        } else {
+          setChannelSettings({ rateLimitPerMinute: DEFAULT_RATE_LIMIT, allowedCategories: [], subsOnlyCategories: [] });
+        }
+        if (commandsRes.ok) {
+          const commandsData = await commandsRes.json();
+          setCustomCommands(Array.isArray(commandsData) ? commandsData : []);
+        } else {
+          setCustomCommands([]);
+        }
+      } catch {
+        setChannelSettings({ rateLimitPerMinute: DEFAULT_RATE_LIMIT, allowedCategories: [], subsOnlyCategories: [] });
+        setCustomCommands([]);
+      }
       try {
         const sub = await callSubCheck(a.token);
         setIsSubscriber(sub);
@@ -233,7 +276,14 @@ export default function PanelPage() {
         console.error(err);
       }
     });
-  }, [callSubCheck, loadCommands]);
+    if (window.Twitch.ext?.features?.onChanged) {
+      window.Twitch.ext.features.onChanged((changes) => {
+        if (Array.isArray(changes) && changes.includes('isChatEnabled')) {
+          setIsChatEnabled(!!window.Twitch.ext?.features?.isChatEnabled);
+        }
+      });
+    }
+  }, [callSubCheck, loadCommands, commandsUrl]);
 
   useEffect(() => {
     if (status !== 'ready') return;
@@ -254,10 +304,16 @@ export default function PanelPage() {
     return <LoadingOverlay />;
   }
 
-  const filteredFollowers = filterCommands(followers);
-  const filteredSubscribers = filterCommands(subscribers);
-  const allCategories = ['Todas', ...categories];
-  const disabled = !canSendChat() || Date.now() < rateLimitCooldownUntil.current;
+  const customForAll = customCommands.filter((c) => !c.subsOnly).map((c) => ({ command: c.command, category: c.category || 'Geral' }));
+  const customForSubs = customCommands.filter((c) => c.subsOnly).map((c) => ({ command: c.command, category: c.category || 'Geral' }));
+  const mergedFollowers = [...followers, ...customForAll];
+  const mergedSubscribers = [...subscribers, ...customForSubs];
+  const mergedCategories = getUniqueCategories(mergedFollowers, mergedSubscribers);
+  const filteredFollowers = filterCommands(mergedFollowers, false);
+  const filteredSubscribers = filterCommands(mergedSubscribers, true);
+  const allCategories = ['Todas', ...mergedCategories];
+  const disabled =
+    !isChatEnabled || !canSendChat() || Date.now() < rateLimitCooldownUntil.current;
 
   const totalFollowerPages = Math.max(1, Math.ceil(filteredFollowers.length / ITEMS_PER_PAGE));
   const totalSubscriberPages = Math.max(1, Math.ceil(filteredSubscribers.length / ITEMS_PER_PAGE));
@@ -342,22 +398,24 @@ export default function PanelPage() {
       <div className="panel-content">
         {rateLimitMsg ? <div className="rate-limit-msg">{rateLimitMsg}</div> : null}
 
-        {showAuthorizePrompt && (
+        {!isChatEnabled && (
           <div className="authorize-prompt">
-            <p>Para enviar comandos no chat com seu nick, autorize a extensão uma vez.</p>
-            <button type="button" className="command-btn authorize-btn" onClick={openAuthorize}>
-              Autorizar para enviar mensagens
-            </button>
+            <p>
+              O chat da extensão está desativado. Ative em Capabilities no Twitch Developer Console
+              ou peça ao streamer para permitir.
+            </p>
           </div>
         )}
 
         {!isSubscriber && (
           <div className="subs-unlock subs-unlock--promo">
-            Desbloqueie os áudios sendo inscrito no canal.
+            {filteredSubscribers.length > 0
+              ? `Desbloqueie mais ${filteredSubscribers.length} ${filteredSubscribers.length === 1 ? 'comando' : 'comandos'} sendo inscrito no canal.`
+              : 'Desbloqueie os áudios sendo inscrito no canal.'}
           </div>
         )}
 
-        <div className="section-title">Comandos (todos)</div>
+        <div className="section-title">Comandos (todos) — {filteredFollowers.length} {filteredFollowers.length === 1 ? 'comando' : 'comandos'}</div>
         <div className="commands-grid">
           {paginatedFollowers.map(({ command }, i) => (
             <button
@@ -397,7 +455,7 @@ export default function PanelPage() {
 
         {isSubscriber ? (
           <>
-            <div className="section-title">Áudios (inscritos)</div>
+            <div className="section-title">Áudios (inscritos) — {filteredSubscribers.length} {filteredSubscribers.length === 1 ? 'comando' : 'comandos'}</div>
             <div className="commands-grid">
               {paginatedSubscribers.map(({ command }, i) => (
                 <button
