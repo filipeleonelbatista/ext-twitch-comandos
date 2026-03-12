@@ -173,7 +173,7 @@ export default function PanelPage() {
 
   const openAuthorize = useCallback(() => {
     const url = authorizeUrl || (auth ? getViewerAuthUrl(auth.channelId) : '');
-    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    if (url) window.open(url, 'twitch_ext_auth', 'width=520,height=640,scrollbars=yes');
   }, [auth, authorizeUrl]);
 
   useEffect(() => {

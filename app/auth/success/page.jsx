@@ -30,8 +30,8 @@ function AuthSuccessContent() {
       <h1 style={{ marginBottom: 12 }}>Autorização concluída</h1>
       <p style={{ color: 'var(--text-muted)', marginBottom: 24 }}>
         {type === 'viewer'
-          ? 'Você já pode fechar esta aba e voltar à extensão para enviar comandos no chat com seu nick.'
-          : 'Conta vinculada. Você já pode fechar esta aba.'}
+          ? 'Feche esta janela e volte ao painel da extensão na página da live na Twitch. Lá você pode clicar nos comandos para enviar no chat com seu nick.'
+          : 'Conta vinculada. Você já pode fechar esta janela.'}
       </p>
       <button
         type="button"
