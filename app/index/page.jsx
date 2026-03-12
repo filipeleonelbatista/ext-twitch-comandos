@@ -696,8 +696,9 @@ function ConfigView() {
 
 function IndexContent() {
   const searchParams = useSearchParams();
-  const isConfigView =
-    searchParams.get('view') === 'config' || searchParams.get('mode') === 'config';
+  // Twitch extension URLs: ?mode=config (configuração) | ?mode=viewer (painel com botões). Também aceita view=config.
+  const mode = searchParams.get('mode') ?? searchParams.get('view') ?? '';
+  const isConfigView = mode === 'config';
 
   if (isConfigView) return <ConfigView />;
   return <PanelPage />;
