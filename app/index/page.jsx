@@ -700,6 +700,8 @@ function IndexContent() {
   const mode = searchParams.get('mode') ?? searchParams.get('view') ?? '';
   const isConfigView = mode === 'config';
 
+  console.log("QUAL PAGINA ABRIR", mode) 
+
   if (isConfigView) return <ConfigView />;
   return <PanelPage />;
 }
