@@ -1,8 +1,7 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback, Suspense } from 'react';
-import PanelPage from '@/app/components/PanelPage';
 import LoadingOverlay from '@/app/components/LoadingOverlay';
 import { getChannelSettingsUrl } from '@/lib/config';
 
@@ -18,7 +17,7 @@ function categoriesToStr(arr) {
   return Array.isArray(arr) ? arr.join(', ') : '';
 }
 
-function ConfigView() {
+export function ConfigView() {
   const [auth, setAuth] = useState(null);
   const [ebsBaseUrl, setEbsBaseUrl] = useState('');
   const [rateLimitPerMinute, setRateLimitPerMinute] = useState(12);
@@ -695,15 +694,22 @@ function ConfigView() {
 }
 
 function IndexContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  // Twitch extension URLs: ?mode=config (configuração) | ?mode=viewer (painel com botões). Também aceita view=config.
   const mode = searchParams.get('mode') ?? searchParams.get('view') ?? '';
-  const isConfigView = mode === 'config';
+  const query = searchParams.toString();
 
-  console.log("QUAL PAGINA ABRIR", mode) 
+  useEffect(() => {
+    const target = mode === 'config' ? '/live_config' : '/';
+    const url = query ? `${target}?${query}` : target;
+    router.replace(url);
+  }, [mode, query, router]);
 
-  if (isConfigView) return <ConfigView />;
-  return <PanelPage />;
+  return (
+    <div className="panel-root">
+      <LoadingOverlay />
+    </div>
+  );
 }
 
 export default function IndexPage() {
